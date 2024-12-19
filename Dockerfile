@@ -19,6 +19,7 @@ COPY . /app
 RUN python -m venv /opt/venv \
     && . /opt/venv/bin/activate \
     && pip install --upgrade pip setuptools wheel \
+    && pip install numpy \
     && pip install -r requirements.txt
 
 # Установка переменных окружения
