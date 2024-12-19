@@ -1,0 +1,4 @@
+flask
+TTS
+torch
+pydub
