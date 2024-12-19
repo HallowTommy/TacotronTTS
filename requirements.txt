@@ -2,3 +2,5 @@ flask
 TTS
 torch
 pydub
+numpy
+rubberband
