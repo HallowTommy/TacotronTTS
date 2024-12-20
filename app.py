@@ -16,11 +16,11 @@ def home():
 @app.route("/generate", methods=["POST"])
 def generate_audio():
     try:
-        # Получаем текст и уровень pitch из запроса
+        # Получаем текст и настройки из запроса
         data = request.get_json()
         text = data.get("text", "")
-        pitch_factor = data.get("pitch_factor", 0.5)  # Значение по умолчанию — 0.5
-
+        pitch_factor = float(data.get("pitch_factor", 0.8))  # По умолчанию 0.8
+        
         if not text:
             return jsonify({"error": "Text is required"}), 400
 
@@ -28,9 +28,9 @@ def generate_audio():
         output_path = "output.wav"
         tts.tts_to_file(text=text, file_path=output_path)
 
-        # Преобразуем голос в низкий мужской
+        # Преобразуем голос
         processed_path = "processed_output.wav"
-        lower_pitch(output_path, processed_path, pitch_factor=float(pitch_factor))
+        lower_pitch(output_path, processed_path, pitch_factor)
 
         # Отправляем обработанный файл пользователю
         return send_file(processed_path, as_attachment=True)
@@ -38,18 +38,14 @@ def generate_audio():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def lower_pitch(input_path, output_path, pitch_factor=0.5):
+def lower_pitch(input_path, output_path):
     """
     Понижает высоту звука для получения низкого голоса.
-
-    :param input_path: Путь к исходному аудиофайлу.
-    :param output_path: Путь для сохранения обработанного файла.
-    :param pitch_factor: Коэффициент изменения высоты звука (меньше 1 = ниже голос).
     """
     audio = AudioSegment.from_file(input_path)
-    # Изменяем частоту кадров для понижения высоты тона
+    # Изменяем скорость воспроизведения для понижения высоты тона
     audio = audio._spawn(audio.raw_data, overrides={
-        "frame_rate": int(audio.frame_rate * pitch_factor)  # Уменьшаем частоту кадров
+        "frame_rate": int(audio.frame_rate * 0.8)  # Уменьшение частоты кадров
     }).set_frame_rate(audio.frame_rate)  # Возвращаем исходную частоту кадров
     audio.export(output_path, format="wav")
 
