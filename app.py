@@ -41,7 +41,7 @@ def lower_pitch(input_path, output_path):
     """
     Понижает высоту звука с фиксированным pitch_factor = 0.6.
     """
-    pitch_factor = 0.6
+    pitch_factor = 0.6  # Фиксированное значение
     audio = AudioSegment.from_file(input_path)
     audio = audio._spawn(audio.raw_data, overrides={
         "frame_rate": int(audio.frame_rate * pitch_factor)
@@ -50,3 +50,4 @@ def lower_pitch(input_path, output_path):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
