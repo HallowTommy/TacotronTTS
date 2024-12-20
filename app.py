@@ -38,14 +38,18 @@ def generate_audio():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def lower_pitch(input_path, output_path):
+def lower_pitch(input_path, output_path, pitch_factor=0.5):
     """
     Понижает высоту звука для получения низкого голоса.
+
+    :param input_path: Путь к исходному аудиофайлу.
+    :param output_path: Путь для сохранения обработанного файла.
+    :param pitch_factor: Коэффициент изменения высоты звука (меньше 1 = ниже голос).
     """
     audio = AudioSegment.from_file(input_path)
-    # Изменяем скорость воспроизведения для понижения высоты тона
+    # Изменяем частоту кадров для понижения высоты тона
     audio = audio._spawn(audio.raw_data, overrides={
-        "frame_rate": int(audio.frame_rate * 0.8)  # Уменьшение частоты кадров
+        "frame_rate": int(audio.frame_rate * pitch_factor)  # Уменьшаем частоту кадров
     }).set_frame_rate(audio.frame_rate)  # Возвращаем исходную частоту кадров
     audio.export(output_path, format="wav")
 
