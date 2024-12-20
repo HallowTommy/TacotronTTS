@@ -16,11 +16,10 @@ def home():
 @app.route("/generate", methods=["POST"])
 def generate_audio():
     try:
-        # Получаем текст и настройки из запроса
+        # Получаем текст из запроса
         data = request.get_json()
         text = data.get("text", "")
-        pitch_factor = float(data.get("pitch_factor", 0.8))  # По умолчанию 0.8
-        
+
         if not text:
             return jsonify({"error": "Text is required"}), 400
 
@@ -28,9 +27,9 @@ def generate_audio():
         output_path = "output.wav"
         tts.tts_to_file(text=text, file_path=output_path)
 
-        # Преобразуем голос
+        # Преобразуем голос с фиксированным значением pitch_factor = 0.6
         processed_path = "processed_output.wav"
-        lower_pitch(output_path, processed_path, pitch_factor)
+        lower_pitch(output_path, processed_path)
 
         # Отправляем обработанный файл пользователю
         return send_file(processed_path, as_attachment=True)
@@ -38,10 +37,11 @@ def generate_audio():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def lower_pitch(input_path, output_path, pitch_factor):
+def lower_pitch(input_path, output_path):
     """
-    Понижает или повышает высоту звука в зависимости от pitch_factor.
+    Понижает высоту звука с фиксированным pitch_factor = 0.6.
     """
+    pitch_factor = 0.6
     audio = AudioSegment.from_file(input_path)
     audio = audio._spawn(audio.raw_data, overrides={
         "frame_rate": int(audio.frame_rate * pitch_factor)
