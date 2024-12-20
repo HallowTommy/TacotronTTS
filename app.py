@@ -44,7 +44,7 @@ def lower_pitch(input_path, output_path):
     audio = AudioSegment.from_file(input_path)
     # Изменяем скорость воспроизведения для понижения высоты тона
     audio = audio._spawn(audio.raw_data, overrides={
-        "frame_rate": int(audio.frame_rate * 0.8)  # Уменьшение частоты кадров
+        "frame_rate": int(audio.frame_rate * 0.6)  # Уменьшение частоты кадров
     }).set_frame_rate(audio.frame_rate)  # Возвращаем исходную частоту кадров
     audio.export(output_path, format="wav")
 
