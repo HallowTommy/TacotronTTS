@@ -1,13 +1,17 @@
-from flask import Flask, request, send_file, jsonify
+from flask import Flask, request, jsonify
 from TTS.api import TTS
 from pydub import AudioSegment
-import io
+import os
+import uuid
 
 app = Flask(__name__)
 
 # Инициализация Coqui TTS с простой моделью
 MODEL_NAME = "tts_models/en/ljspeech/tacotron2-DDC"
 tts = TTS(MODEL_NAME, progress_bar=False)
+
+STATIC_DIR = "static"
+os.makedirs(STATIC_DIR, exist_ok=True)
 
 @app.route("/", methods=["GET"])
 def home():
@@ -23,45 +27,51 @@ def generate_audio():
         if not text:
             return jsonify({"error": "Text is required"}), 400
 
-        # Генерируем аудиофайл в памяти
-        output_buffer = io.BytesIO()
-        tts.tts_to_file(text=text, file_path=output_buffer)
-        output_buffer.seek(0)
+        # Генерируем уникальное имя файла
+        output_filename = f"{uuid.uuid4().hex}.wav"
+        output_path = os.path.join(STATIC_DIR, output_filename)
 
-        # Преобразуем голос в памяти с фиксированным pitch_factor = 0.6
-        processed_buffer = lower_pitch(output_buffer)
+        # Генерируем аудиофайл
+        tts.tts_to_file(text=text, file_path=output_path)
 
-        # Отправляем обработанный файл пользователю
-        return send_file(
-            processed_buffer,
-            mimetype="audio/wav",
-            as_attachment=True,
-            download_name="processed_output.wav"
-        )
+        # Преобразуем голос с фиксированным значением pitch_factor = 0.6
+        processed_filename = f"processed_{uuid.uuid4().hex}.wav"
+        processed_path = os.path.join(STATIC_DIR, processed_filename)
+        lower_pitch(output_path, processed_path)
+
+        # Удаляем исходный файл
+        os.remove(output_path)
+
+        # Формируем полный URL для обработанного файла
+        full_url = f"https://tacotrontts-production.up.railway.app/{STATIC_DIR}/{processed_filename}"
+        return jsonify({"audio_url": full_url})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/delete", methods=["POST"])
 def delete_file():
-    return jsonify({"status": "success", "message": "File deletion is not required in memory-based processing."})
+    try:
+        data = request.get_json()
+        file_path = data.get("file_path")
 
-def lower_pitch(input_buffer):
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+            return jsonify({"status": "success", "message": "File deleted successfully."})
+        return jsonify({"status": "error", "message": "File not found."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+def lower_pitch(input_path, output_path):
     """
     Понижает высоту звука с фиксированным pitch_factor = 0.6.
     """
     pitch_factor = 0.6  # Фиксированное значение
-    input_buffer.seek(0)  # Возвращаем указатель в начало
-    audio = AudioSegment.from_file(input_buffer)
+    audio = AudioSegment.from_file(input_path)
     audio = audio._spawn(audio.raw_data, overrides={
         "frame_rate": int(audio.frame_rate * pitch_factor)
     }).set_frame_rate(audio.frame_rate)
-
-    # Сохраняем в новый буфер
-    output_buffer = io.BytesIO()
-    audio.export(output_buffer, format="wav")
-    output_buffer.seek(0)
-    return output_buffer
+    audio.export(output_path, format="wav")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
