@@ -28,11 +28,12 @@ def generate_audio():
         tts.tts_to_file(text=text, file_path=output_path)
 
         # Преобразуем голос с фиксированным значением pitch_factor = 0.6
-        processed_path = "processed_output.wav"
+        processed_path = "static/processed_output.wav"  # Сохраняем в папку static
         lower_pitch(output_path, processed_path)
 
-        # Отправляем обработанный файл пользователю
-        return jsonify({"audio_url": f"/static/{processed_path}"})
+        # Формируем полный URL для аудиофайла
+        full_url = f"https://tacotrontts-production.up.railway.app/{processed_path}"
+        return jsonify({"audio_url": full_url})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
