@@ -32,10 +32,24 @@ def generate_audio():
         lower_pitch(output_path, processed_path)
 
         # Отправляем обработанный файл пользователю
-        return send_file(processed_path, as_attachment=True)
+        return jsonify({"audio_url": f"/static/{processed_path}"})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/delete", methods=["POST"])
+def delete_file():
+    try:
+        data = request.get_json()
+        file_path = data.get("file_path")
+
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+            return jsonify({"status": "success", "message": "File deleted successfully."})
+        return jsonify({"status": "error", "message": "File not found."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
 
 def lower_pitch(input_path, output_path):
     """
