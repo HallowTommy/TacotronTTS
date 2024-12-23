@@ -1,13 +1,18 @@
-from flask import Flask, request, send_file, jsonify
+from flask import Flask, request, jsonify
 from TTS.api import TTS
 from pydub import AudioSegment
 import os
+import uuid
 
 app = Flask(__name__)
 
-# Инициализация Coqui TTS с простой моделью
+# Инициализация Coqui TTS с моделью
 MODEL_NAME = "tts_models/en/ljspeech/tacotron2-DDC"
 tts = TTS(MODEL_NAME, progress_bar=False)
+
+# Путь для сохранения аудиофайлов
+OUTPUT_DIR = "generated_audio"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 @app.route("/", methods=["GET"])
 def home():
@@ -23,16 +28,22 @@ def generate_audio():
         if not text:
             return jsonify({"error": "Text is required"}), 400
 
-        # Генерируем аудиофайл
-        output_path = "output.wav"
+        # Генерируем уникальное имя для аудиофайла
+        unique_id = str(uuid.uuid4())
+        output_path = os.path.join(OUTPUT_DIR, f"{unique_id}.wav")
+
+        # Генерация TTS
         tts.tts_to_file(text=text, file_path=output_path)
 
-        # Преобразуем голос с фиксированным значением pitch_factor = 0.6
-        processed_path = "processed_output.wav"
+        # Преобразование высоты звука
+        processed_path = os.path.join(OUTPUT_DIR, f"{unique_id}_processed.wav")
         lower_pitch(output_path, processed_path)
 
-        # Отправляем обработанный файл пользователю
-        return send_file(processed_path, as_attachment=True)
+        # Формирование ссылки на файл
+        file_url = f"http://your-tts-server-url/{processed_path}"
+
+        # Возвращаем ссылку на аудиофайл
+        return jsonify({"url": file_url})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
