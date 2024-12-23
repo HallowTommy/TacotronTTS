@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from TTS.api import TTS
 from pydub import AudioSegment
 import os
@@ -40,13 +40,20 @@ def generate_audio():
         lower_pitch(output_path, processed_path)
 
         # Формирование ссылки на файл
-        file_url = f"http://your-tts-server-url/{processed_path}"
+        file_url = f"http://{request.host}/files/{unique_id}_processed.wav"
 
         # Возвращаем ссылку на аудиофайл
         return jsonify({"url": file_url})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/files/<path:filename>", methods=["GET"])
+def serve_file(filename):
+    """
+    Обслуживает сгенерированные аудиофайлы.
+    """
+    return send_from_directory(OUTPUT_DIR, filename)
 
 def lower_pitch(input_path, output_path):
     """
