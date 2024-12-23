@@ -44,7 +44,11 @@ def generate_audio():
 
         # Формируем полный URL для обработанного файла
         full_url = f"https://tacotrontts-production.up.railway.app/{STATIC_DIR}/{processed_filename}"
-        return jsonify({"audio_url": full_url}), 200, {"Content-Type": "application/json"}
+
+        # Возвращаем JSON-ответ
+        response = jsonify({"audio_url": full_url})
+        response.headers["Content-Type"] = "application/json"  # Явно указываем JSON
+        return response
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
