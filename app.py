@@ -1,7 +1,7 @@
 from flask import Flask, request, send_file, jsonify
 from TTS.api import TTS
 from pydub import AudioSegment
-import os
+import io
 
 app = Flask(__name__)
 
@@ -23,46 +23,45 @@ def generate_audio():
         if not text:
             return jsonify({"error": "Text is required"}), 400
 
-        # Генерируем аудиофайл
-        output_path = "output.wav"
-        tts.tts_to_file(text=text, file_path=output_path)
+        # Генерируем аудиофайл в памяти
+        output_buffer = io.BytesIO()
+        tts.tts_to_file(text=text, file_path=output_buffer)
+        output_buffer.seek(0)
 
-        # Преобразуем голос с фиксированным значением pitch_factor = 0.6
-        processed_path = "static/processed_output.wav"  # Сохраняем в папку static
-        lower_pitch(output_path, processed_path)
+        # Преобразуем голос в памяти с фиксированным pitch_factor = 0.6
+        processed_buffer = lower_pitch(output_buffer)
 
-        # Формируем полный URL для аудиофайла
-        full_url = f"https://tacotrontts-production.up.railway.app/{processed_path}"
-        return jsonify({"audio_url": full_url})
+        # Отправляем обработанный файл пользователю
+        return send_file(
+            processed_buffer,
+            mimetype="audio/wav",
+            as_attachment=True,
+            download_name="processed_output.wav"
+        )
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/delete", methods=["POST"])
 def delete_file():
-    try:
-        data = request.get_json()
-        file_path = data.get("file_path")
+    return jsonify({"status": "success", "message": "File deletion is not required in memory-based processing."})
 
-        if file_path and os.path.exists(file_path):
-            os.remove(file_path)
-            return jsonify({"status": "success", "message": "File deleted successfully."})
-        return jsonify({"status": "error", "message": "File not found."})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
-
-
-def lower_pitch(input_path, output_path):
+def lower_pitch(input_buffer):
     """
     Понижает высоту звука с фиксированным pitch_factor = 0.6.
     """
     pitch_factor = 0.6  # Фиксированное значение
-    audio = AudioSegment.from_file(input_path)
+    input_buffer.seek(0)  # Возвращаем указатель в начало
+    audio = AudioSegment.from_file(input_buffer)
     audio = audio._spawn(audio.raw_data, overrides={
         "frame_rate": int(audio.frame_rate * pitch_factor)
     }).set_frame_rate(audio.frame_rate)
-    audio.export(output_path, format="wav")
+
+    # Сохраняем в новый буфер
+    output_buffer = io.BytesIO()
+    audio.export(output_buffer, format="wav")
+    output_buffer.seek(0)
+    return output_buffer
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
