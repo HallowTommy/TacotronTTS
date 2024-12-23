@@ -42,7 +42,7 @@ def generate_audio():
         # Формирование ссылки на файл
         file_url = f"http://{request.host}/files/{unique_id}_processed.wav"
 
-        # Возвращаем ссылку на аудиофайл
+        # Возвращаем ссылку на аудиофайл в формате JSON
         return jsonify({"url": file_url})
 
     except Exception as e:
@@ -53,7 +53,10 @@ def serve_file(filename):
     """
     Обслуживает сгенерированные аудиофайлы.
     """
-    return send_from_directory(OUTPUT_DIR, filename)
+    try:
+        return send_from_directory(OUTPUT_DIR, filename, as_attachment=False)
+    except FileNotFoundError:
+        return jsonify({"error": "File not found"}), 404
 
 def lower_pitch(input_path, output_path):
     """
