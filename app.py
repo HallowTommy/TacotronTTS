@@ -3,8 +3,6 @@ from TTS.api import TTS
 from pydub import AudioSegment
 import os
 import uuid
-import threading
-import time
 
 app = Flask(__name__, static_folder="static")
 
@@ -14,9 +12,6 @@ tts = TTS(MODEL_NAME, progress_bar=False)
 
 STATIC_DIR = "static"
 os.makedirs(STATIC_DIR, exist_ok=True)
-
-# Словарь для отслеживания удаления файлов
-delete_queue = {}
 
 @app.route("/", methods=["GET"])
 def home():
@@ -55,13 +50,8 @@ def generate_audio():
         full_url = f"https://tacotrontts-production.up.railway.app/static/{processed_filename}"
         print(f"Generated audio file URL: {full_url}")
 
-        # Добавляем в очередь на удаление
-        delete_queue[processed_path] = time.time() + 300  # Удаление через 5 минут
-
         # Возвращаем JSON-ответ
-        response = jsonify({"audio_url": full_url})
-        response.headers["Content-Type"] = "application/json"  # Явно указываем JSON
-        return response
+        return jsonify({"audio_url": full_url})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -94,24 +84,5 @@ def lower_pitch(input_path, output_path):
     }).set_frame_rate(audio.frame_rate)
     audio.export(output_path, format="wav")
 
-def cleanup_files():
-    """Удаляет файлы, время которых истекло."""
-    while True:
-        current_time = time.time()
-        for file_path, delete_time in list(delete_queue.items()):
-            if current_time >= delete_time:
-                try:
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
-                        print(f"Deleted expired file: {file_path}")
-                    del delete_queue[file_path]
-                except Exception as e:
-                    print(f"Error deleting file {file_path}: {e}")
-        time.sleep(60)  # Проверяем каждые 60 секунд
-
-# Запускаем поток для очистки файлов
-threading.Thread(target=cleanup_files, daemon=True).start()
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
