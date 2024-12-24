@@ -4,7 +4,7 @@ from pydub import AudioSegment
 import os
 import uuid
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static")
 
 # Инициализация Coqui TTS с простой моделью
 MODEL_NAME = "tts_models/en/ljspeech/tacotron2-DDC"
@@ -39,11 +39,16 @@ def generate_audio():
         processed_path = os.path.join(STATIC_DIR, processed_filename)
         lower_pitch(output_path, processed_path)
 
+        # Убедимся, что обработанный файл создан
+        if not os.path.exists(processed_path):
+            return jsonify({"error": "Processed audio file not found."}), 500
+
         # Удаляем исходный файл
         os.remove(output_path)
 
         # Формируем полный URL для обработанного файла
-        full_url = f"https://tacotrontts-production.up.railway.app/{STATIC_DIR}/{processed_filename}"
+        full_url = f"https://tacotrontts-production.up.railway.app/static/{processed_filename}"
+        print(f"Generated audio file URL: {full_url}")
 
         # Возвращаем JSON-ответ
         response = jsonify({"audio_url": full_url})
@@ -59,9 +64,13 @@ def delete_file():
         data = request.get_json()
         file_path = data.get("file_path")
 
-        if file_path and os.path.exists(file_path):
-            os.remove(file_path)
-            return jsonify({"status": "success", "message": "File deleted successfully."})
+        if file_path:
+            local_path = file_path.replace(
+                "https://tacotrontts-production.up.railway.app/static/", "static/"
+            )
+            if os.path.exists(local_path):
+                os.remove(local_path)
+                return jsonify({"status": "success", "message": "File deleted successfully."})
         return jsonify({"status": "error", "message": "File not found."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
