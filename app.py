@@ -73,23 +73,24 @@ def lower_pitch(input_path, output_path):
     }).set_frame_rate(audio.frame_rate)
     audio.export(output_path, format="wav")
 
-def send_file_to_vps(local_path):
-    """
-    Отправляет файл на VPS через SCP.
-    """
+def send_audio_to_vps(file_path):
+    import paramiko
+
     try:
+        # Подключение к VPS
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(VPS_HOST, username=VPS_USERNAME, password=VPS_PASSWORD)
 
+        # Передача файла
         sftp = ssh.open_sftp()
-        sftp.put(local_path, VPS_DEST_PATH)  # Загружаем файл в указанный путь на VPS
+        sftp.put(file_path, VPS_DEST_PATH)  # Локальный файл -> удаленный путь
         sftp.close()
         ssh.close()
-        print(f"File {local_path} sent to VPS successfully.")
+        print("File successfully sent to VPS.")
+
     except Exception as e:
         print(f"Error sending file to VPS: {e}")
-        raise e
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
