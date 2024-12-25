@@ -1,24 +1,22 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from TTS.api import TTS
 from pydub import AudioSegment
 import os
 import uuid
-import paramiko  # Для передачи файла через SCP
+import paramiko
 
-# Настройки Flask приложения
 app = Flask(__name__, static_folder="static")
 
-# Инициализация Coqui TTS с моделью Tacotron2
+# Инициализация Coqui TTS с моделью
 MODEL_NAME = "tts_models/en/ljspeech/tacotron2-DDC"
 tts = TTS(MODEL_NAME, progress_bar=False)
 
 # Настройки для VPS
 VPS_HOST = "95.179.247.70"  # IP-адрес вашего VPS
-VPS_USERNAME = "root"       # Имя пользователя для входа
-VPS_PASSWORD = "hackme"    # Пароль для входа на VPS
-VPS_DEST_PATH = "/tmp/tts_audio.wav"  # Путь для аудиофайла на VPS
+VPS_USERNAME = "root"       # Имя пользователя
+VPS_PASSWORD = "hackme"     # Пароль
+VPS_DEST_PATH = "/tmp/tts_audio.wav"  # Путь на VPS
 
-# Директория для временных файлов
 STATIC_DIR = "static"
 os.makedirs(STATIC_DIR, exist_ok=True)
 
@@ -29,53 +27,53 @@ def home():
 @app.route("/generate", methods=["POST"])
 def generate_audio():
     try:
-        # Получение текста из запроса
+        # Получаем текст из запроса
         data = request.get_json()
         text = data.get("text", "")
 
         if not text:
             return jsonify({"error": "Text is required"}), 400
 
-        # Генерация уникального имени файла
+        # Генерируем уникальное имя файла
         output_filename = f"{uuid.uuid4().hex}.wav"
         output_path = os.path.join(STATIC_DIR, output_filename)
 
-        # Генерация аудиофайла с помощью TTS
-        print(f"Генерация аудио для текста: {text}")
+        # Генерация аудио
         tts.tts_to_file(text=text, file_path=output_path)
 
-        # Проверяем, создан ли файл
-        if not os.path.exists(output_path):
-            raise Exception(f"Файл аудио не найден: {output_path}")
+        # Понижаем высоту звука
+        processed_filename = f"processed_{uuid.uuid4().hex}.wav"
+        processed_path = os.path.join(STATIC_DIR, processed_filename)
+        lower_pitch(output_path, processed_path)
 
-        print(f"Аудио сгенерировано: {output_path}")
+        # Убедимся, что файл существует
+        if not os.path.exists(processed_path):
+            return jsonify({"error": "Processed audio file not found."}), 500
 
-        # Отправка файла на VPS
-        send_audio_to_vps(output_path)
-        print("Аудиофайл успешно отправлен на VPS.")
+        # Отправляем файл на VPS
+        send_file_to_vps(processed_path)
 
-        # Удаление временных файлов
+        # Удаляем временные файлы
         os.remove(output_path)
-        print("Временные файлы удалены.")
+        os.remove(processed_path)
 
-        return jsonify({"status": "success", "message": "Файл успешно отправлен на VPS."})
+        return jsonify({"status": "success", "message": "File sent to VPS successfully."})
 
     except Exception as e:
-        print(f"Ошибка: {e}")
         return jsonify({"error": str(e)}), 500
 
 def lower_pitch(input_path, output_path):
     """
     Понижает высоту звука с фиксированным pitch_factor = 0.6.
     """
-    pitch_factor = 0.6  # Фиксированное значение
+    pitch_factor = 0.6
     audio = AudioSegment.from_file(input_path)
     audio = audio._spawn(audio.raw_data, overrides={
         "frame_rate": int(audio.frame_rate * pitch_factor)
     }).set_frame_rate(audio.frame_rate)
     audio.export(output_path, format="wav")
 
-def send_audio_to_vps(file_path):
+def send_file_to_vps(file_path):
     """
     Отправляет аудиофайл на VPS через SCP.
     """
@@ -85,15 +83,16 @@ def send_audio_to_vps(file_path):
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(VPS_HOST, username=VPS_USERNAME, password=VPS_PASSWORD)
 
-        # Передача файла через SCP
+        # Передача файла
         sftp = ssh.open_sftp()
-        sftp.put(file_path, VPS_DEST_PATH)  # Локальный файл -> путь на VPS
+        sftp.put(file_path, VPS_DEST_PATH)
         sftp.close()
         ssh.close()
-        print("Файл успешно отправлен на VPS.")
+        print("File successfully sent to VPS.")
 
     except Exception as e:
-        print(f"Ошибка при отправке файла на VPS: {e}")
+        print(f"Error sending file to VPS: {e}")
+        raise
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
