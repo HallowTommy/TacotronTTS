@@ -3,3 +3,4 @@ flask-cors
 TTS
 torch
 pydub
+paramiko
