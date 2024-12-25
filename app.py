@@ -4,12 +4,18 @@ from pydub import AudioSegment
 import os
 import uuid
 import paramiko  # Для передачи файлов через SCP
+import logging
+
+# Настройка логирования
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(levelname)s]: %(message)s')
+logger = logging.getLogger()
 
 app = Flask(__name__, static_folder="static")
 
 # Инициализация модели TTS
 MODEL_NAME = "tts_models/en/ljspeech/tacotron2-DDC"
 tts = TTS(MODEL_NAME, progress_bar=False)
+logger.info("TTS model initialized: %s", MODEL_NAME)
 
 # Настройки для VPS
 VPS_HOST = "95.179.247.70"  # IP-адрес вашего VPS
@@ -19,6 +25,7 @@ VPS_DEST_PATH = "/tmp/tts_audio.wav"  # Путь на VPS
 
 STATIC_DIR = "static"
 os.makedirs(STATIC_DIR, exist_ok=True)
+logger.info("Static directory created: %s", STATIC_DIR)
 
 @app.route("/", methods=["GET"])
 def home():
@@ -27,70 +34,89 @@ def home():
 @app.route("/generate", methods=["POST"])
 def generate_audio():
     try:
+        logger.info("Received request to generate audio.")
+
         # Получение текста из запроса
         data = request.get_json()
         text = data.get("text", "")
+        logger.debug("Text received: %s", text)
 
         if not text:
+            logger.error("No text provided in the request.")
             return jsonify({"error": "Text is required"}), 400
 
         # Генерация имени файла
         output_filename = f"{uuid.uuid4().hex}.wav"
         output_path = os.path.join(STATIC_DIR, output_filename)
+        logger.debug("Generated output file path: %s", output_path)
 
         # Генерация аудио
         tts.tts_to_file(text=text, file_path=output_path)
+        logger.info("Audio file generated: %s", output_path)
 
         # Изменение высоты звука
         processed_filename = f"processed_{uuid.uuid4().hex}.wav"
         processed_path = os.path.join(STATIC_DIR, processed_filename)
         lower_pitch(output_path, processed_path)
+        logger.info("Processed audio file created: %s", processed_path)
 
         # Проверка существования файла
         if not os.path.exists(processed_path):
+            logger.error("Processed audio file not found.")
             return jsonify({"error": "Processed audio file not found."}), 500
 
         # Отправка файла на VPS
+        logger.info("Attempting to send file to VPS: %s", VPS_HOST)
         send_file_to_vps(processed_path)
 
         # Удаление временных файлов
         os.remove(output_path)
         os.remove(processed_path)
+        logger.info("Temporary files deleted.")
 
         return jsonify({"status": "success", "message": "File sent to VPS successfully."})
 
     except Exception as e:
+        logger.error("Error during audio generation: %s", str(e))
         return jsonify({"error": str(e)}), 500
 
 def lower_pitch(input_path, output_path):
     """
     Понижает высоту звука с фиксированным pitch_factor = 0.6.
     """
-    pitch_factor = 0.6
-    audio = AudioSegment.from_file(input_path)
-    audio = audio._spawn(audio.raw_data, overrides={
-        "frame_rate": int(audio.frame_rate * pitch_factor)
-    }).set_frame_rate(audio.frame_rate)
-    audio.export(output_path, format="wav")
+    try:
+        logger.info("Lowering pitch of the audio.")
+        pitch_factor = 0.6
+        audio = AudioSegment.from_file(input_path)
+        audio = audio._spawn(audio.raw_data, overrides={
+            "frame_rate": int(audio.frame_rate * pitch_factor)
+        }).set_frame_rate(audio.frame_rate)
+        audio.export(output_path, format="wav")
+        logger.info("Pitch adjustment complete: %s", output_path)
+    except Exception as e:
+        logger.error("Error lowering pitch: %s", str(e))
+        raise
 
 def send_file_to_vps(file_path):
     """
     Отправляет файл на VPS через SCP.
     """
     try:
+        logger.info("Connecting to VPS at %s", VPS_HOST)
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(VPS_HOST, username=VPS_USERNAME, password=VPS_PASSWORD)
+        logger.info("Connected to VPS successfully.")
 
         # Передача файла
         sftp = ssh.open_sftp()
         sftp.put(file_path, VPS_DEST_PATH)
         sftp.close()
         ssh.close()
-        print("File successfully sent to VPS.")
+        logger.info("File successfully sent to VPS: %s", file_path)
 
     except Exception as e:
-        print(f"Error sending file to VPS: {e}")
+        logger.error("Error sending file to VPS: %s", str(e))
         raise
 
 if __name__ == "__main__":
