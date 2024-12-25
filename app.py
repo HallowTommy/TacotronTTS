@@ -1,13 +1,13 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from TTS.api import TTS
 from pydub import AudioSegment
 import os
 import uuid
-import paramiko
+import paramiko  # Для передачи файлов через SCP
 
 app = Flask(__name__, static_folder="static")
 
-# Инициализация Coqui TTS с моделью
+# Инициализация модели TTS
 MODEL_NAME = "tts_models/en/ljspeech/tacotron2-DDC"
 tts = TTS(MODEL_NAME, progress_bar=False)
 
@@ -27,33 +27,33 @@ def home():
 @app.route("/generate", methods=["POST"])
 def generate_audio():
     try:
-        # Получаем текст из запроса
+        # Получение текста из запроса
         data = request.get_json()
         text = data.get("text", "")
 
         if not text:
             return jsonify({"error": "Text is required"}), 400
 
-        # Генерируем уникальное имя файла
+        # Генерация имени файла
         output_filename = f"{uuid.uuid4().hex}.wav"
         output_path = os.path.join(STATIC_DIR, output_filename)
 
         # Генерация аудио
         tts.tts_to_file(text=text, file_path=output_path)
 
-        # Понижаем высоту звука
+        # Изменение высоты звука
         processed_filename = f"processed_{uuid.uuid4().hex}.wav"
         processed_path = os.path.join(STATIC_DIR, processed_filename)
         lower_pitch(output_path, processed_path)
 
-        # Убедимся, что файл существует
+        # Проверка существования файла
         if not os.path.exists(processed_path):
             return jsonify({"error": "Processed audio file not found."}), 500
 
-        # Отправляем файл на VPS
+        # Отправка файла на VPS
         send_file_to_vps(processed_path)
 
-        # Удаляем временные файлы
+        # Удаление временных файлов
         os.remove(output_path)
         os.remove(processed_path)
 
@@ -75,10 +75,9 @@ def lower_pitch(input_path, output_path):
 
 def send_file_to_vps(file_path):
     """
-    Отправляет аудиофайл на VPS через SCP.
+    Отправляет файл на VPS через SCP.
     """
     try:
-        # Подключение к VPS
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(VPS_HOST, username=VPS_USERNAME, password=VPS_PASSWORD)
@@ -96,3 +95,4 @@ def send_file_to_vps(file_path):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
