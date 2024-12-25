@@ -34,32 +34,42 @@ def generate_audio():
         if not text:
             return jsonify({"error": "Text is required"}), 400
 
-        # Генерируем уникальное имя файла
+        # Генерация файла
+        print(f"Generating TTS audio for text: {text}")
         output_filename = f"{uuid.uuid4().hex}.wav"
         output_path = os.path.join(STATIC_DIR, output_filename)
-
-        # Генерируем аудиофайл
         tts.tts_to_file(text=text, file_path=output_path)
 
-        # Преобразуем голос с фиксированным значением pitch_factor = 0.6
+        # Проверяем, создан ли файл
+        if not os.path.exists(output_path):
+            raise Exception(f"Generated audio file not found at {output_path}")
+
+        print(f"Audio generated: {output_path}")
+
+        # Преобразование высоты тона
         processed_filename = f"processed_{uuid.uuid4().hex}.wav"
         processed_path = os.path.join(STATIC_DIR, processed_filename)
         lower_pitch(output_path, processed_path)
 
-        # Убедимся, что обработанный файл создан
+        # Проверяем, обработан ли файл
         if not os.path.exists(processed_path):
-            return jsonify({"error": "Processed audio file not found."}), 500
+            raise Exception(f"Processed audio file not found at {processed_path}")
 
-        # Отправляем файл на VPS через SCP
-        send_file_to_vps(processed_path)
+        print(f"Processed audio file: {processed_path}")
 
-        # Удаляем временные файлы
+        # Отправка файла на VPS
+        send_audio_to_vps(processed_path)
+        print("Audio sent to VPS successfully.")
+
+        # Удаление временных файлов
         os.remove(output_path)
         os.remove(processed_path)
+        print("Temporary files deleted.")
 
         return jsonify({"status": "success", "message": "File sent to VPS successfully."})
 
     except Exception as e:
+        print(f"Error in generate_audio: {e}")
         return jsonify({"error": str(e)}), 500
 
 def lower_pitch(input_path, output_path):
