@@ -14,7 +14,7 @@ tts = TTS(MODEL_NAME, progress_bar=False)
 # Настройки для VPS
 VPS_HOST = "95.179.247.70"  # IP-адрес вашего VPS
 VPS_USERNAME = "root"       # Имя пользователя (в данном случае root)
-VPS_PASSWORD = "4wY_[4L6g6e(,uJj"  # Пароль для входа на VPS
+VPS_PASSWORD = "hackme"  # Пароль для входа на VPS
 VPS_DEST_PATH = "/tmp/tts_audio.wav"  # Путь, куда будем отправлять аудио
 
 STATIC_DIR = "static"
