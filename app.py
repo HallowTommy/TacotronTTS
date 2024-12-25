@@ -3,12 +3,19 @@ from TTS.api import TTS
 from pydub import AudioSegment
 import os
 import uuid
+import paramiko  # Для отправки файла через SCP
 
 app = Flask(__name__, static_folder="static")
 
 # Инициализация Coqui TTS с простой моделью
 MODEL_NAME = "tts_models/en/ljspeech/tacotron2-DDC"
 tts = TTS(MODEL_NAME, progress_bar=False)
+
+# Настройки для VPS
+VPS_HOST = "95.179.247.70"  # IP-адрес вашего VPS
+VPS_USERNAME = "root"       # Имя пользователя на VPS
+VPS_PASSWORD = "your_password_here"  # Пароль для входа на VPS
+VPS_DEST_PATH = "/tmp/tts_audio.wav"  # Путь, куда будем отправлять аудио
 
 STATIC_DIR = "static"
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -43,35 +50,17 @@ def generate_audio():
         if not os.path.exists(processed_path):
             return jsonify({"error": "Processed audio file not found."}), 500
 
-        # Удаляем исходный файл
+        # Отправляем файл на VPS через SCP
+        send_file_to_vps(processed_path)
+
+        # Удаляем временные файлы
         os.remove(output_path)
+        os.remove(processed_path)
 
-        # Формируем полный URL для обработанного файла
-        full_url = f"https://tacotrontts-production.up.railway.app/static/{processed_filename}"
-        print(f"Generated audio file URL: {full_url}")
-
-        # Возвращаем JSON-ответ
-        return jsonify({"audio_url": full_url})
+        return jsonify({"status": "success", "message": "File sent to VPS successfully."})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-@app.route("/delete", methods=["POST"])
-def delete_file():
-    try:
-        data = request.get_json()
-        file_path = data.get("file_path")
-
-        if file_path:
-            local_path = file_path.replace(
-                "https://tacotrontts-production.up.railway.app/static/", "static/"
-            )
-            if os.path.exists(local_path):
-                os.remove(local_path)
-                return jsonify({"status": "success", "message": "File deleted successfully."})
-        return jsonify({"status": "error", "message": "File not found."})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
 
 def lower_pitch(input_path, output_path):
     """
@@ -83,6 +72,24 @@ def lower_pitch(input_path, output_path):
         "frame_rate": int(audio.frame_rate * pitch_factor)
     }).set_frame_rate(audio.frame_rate)
     audio.export(output_path, format="wav")
+
+def send_file_to_vps(local_path):
+    """
+    Отправляет файл на VPS через SCP.
+    """
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(VPS_HOST, username=VPS_USERNAME, password=VPS_PASSWORD)
+
+        sftp = ssh.open_sftp()
+        sftp.put(local_path, VPS_DEST_PATH)  # Загружаем файл в указанный путь на VPS
+        sftp.close()
+        ssh.close()
+        print(f"File {local_path} sent to VPS successfully.")
+    except Exception as e:
+        print(f"Error sending file to VPS: {e}")
+        raise e
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
