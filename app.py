@@ -19,8 +19,8 @@ logger.info("TTS model initialized: %s", MODEL_NAME)
 
 # Настройки для VPS
 VPS_HOST = "95.179.247.70"  # IP-адрес вашего VPS
-VPS_USERNAME = "admin"       # Имя пользователя
-VPS_PASSWORD = "hackme"     # Пароль
+VPS_USERNAME = "root"       # Имя пользователя
+VPS_PASSWORD = "4wY_[4L6g6e(,uJj"     # Пароль
 VPS_DEST_PATH = "/tmp/tts_audio.wav"  # Путь на VPS
 
 STATIC_DIR = "static"
