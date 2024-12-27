@@ -4,3 +4,4 @@ TTS
 torch
 pydub
 paramiko
+ffmpeg
