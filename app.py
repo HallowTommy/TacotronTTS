@@ -5,6 +5,7 @@ import os
 import uuid
 import paramiko  # Для передачи файлов через SCP
 import logging
+import subprocess
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(levelname)s]: %(message)s')
@@ -21,7 +22,7 @@ logger.info("TTS model initialized: %s", MODEL_NAME)
 VPS_HOST = "95.179.247.70"  # IP-адрес вашего VPS
 VPS_USERNAME = "root"       # Имя пользователя
 VPS_PASSWORD = "4wY_[4L6g6e(,uJj"     # Пароль
-VPS_DEST_PATH = "/tmp/tts_audio.wav"  # Путь на VPS
+VPS_DEST_PATH = "/tmp/tts_audio.mp3"  # Путь на VPS
 
 STATIC_DIR = "static"
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -60,18 +61,25 @@ def generate_audio():
         lower_pitch(output_path, processed_path)
         logger.info("Processed audio file created: %s", processed_path)
 
+        # Конвертация в MP3
+        mp3_filename = f"{uuid.uuid4().hex}.mp3"
+        mp3_path = os.path.join(STATIC_DIR, mp3_filename)
+        convert_to_mp3(processed_path, mp3_path)
+        logger.info("Converted to MP3: %s", mp3_path)
+
         # Проверка существования файла
-        if not os.path.exists(processed_path):
-            logger.error("Processed audio file not found.")
-            return jsonify({"error": "Processed audio file not found."}), 500
+        if not os.path.exists(mp3_path):
+            logger.error("MP3 file not found.")
+            return jsonify({"error": "MP3 file not found."}), 500
 
         # Отправка файла на VPS
         logger.info("Attempting to send file to VPS: %s", VPS_HOST)
-        send_file_to_vps(processed_path)
+        send_file_to_vps(mp3_path)
 
         # Удаление временных файлов
         os.remove(output_path)
         os.remove(processed_path)
+        os.remove(mp3_path)
         logger.info("Temporary files deleted.")
 
         return jsonify({"status": "success", "message": "File sent to VPS successfully."})
@@ -95,6 +103,18 @@ def lower_pitch(input_path, output_path):
         logger.info("Pitch adjustment complete: %s", output_path)
     except Exception as e:
         logger.error("Error lowering pitch: %s", str(e))
+        raise
+
+def convert_to_mp3(input_path, output_path):
+    """
+    Конвертирует WAV файл в MP3.
+    """
+    try:
+        logger.info("Converting to MP3.")
+        subprocess.run(["ffmpeg", "-i", input_path, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "128k", output_path], check=True)
+        logger.info("Conversion complete: %s", output_path)
+    except Exception as e:
+        logger.error("Error converting to MP3: %s", str(e))
         raise
 
 def send_file_to_vps(file_path):
