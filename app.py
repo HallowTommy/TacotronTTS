@@ -28,6 +28,20 @@ STATIC_DIR = "static"
 os.makedirs(STATIC_DIR, exist_ok=True)
 logger.info("Static directory created: %s", STATIC_DIR)
 
+# Функция для проверки наличия ffmpeg
+def check_ffmpeg():
+    try:
+        subprocess.run(["ffmpeg", "-version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        logger.info("ffmpeg is installed.")
+    except FileNotFoundError:
+        logger.error("ffmpeg is not installed. Please install ffmpeg.")
+        raise
+    except subprocess.CalledProcessError as e:
+        logger.error("Error checking ffmpeg version: %s", e)
+        raise
+
+check_ffmpeg()  # Проверяем наличие ffmpeg перед обработкой аудио
+
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"message": "SHROKAI TTS is running!"})
@@ -141,4 +155,3 @@ def send_file_to_vps(file_path):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
