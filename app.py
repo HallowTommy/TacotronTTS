@@ -35,7 +35,7 @@ def check_ffmpeg():
         logger.info("ffmpeg is installed.")
     except FileNotFoundError:
         logger.error("ffmpeg is not installed. Please install ffmpeg.")
-        raise
+        raise Exception("ffmpeg is required but not installed.")
     except subprocess.CalledProcessError as e:
         logger.error("Error checking ffmpeg version: %s", e)
         raise
