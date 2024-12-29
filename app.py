@@ -22,7 +22,7 @@ logger.info("TTS model initialized: %s", MODEL_NAME)
 VPS_HOST = "95.179.247.70"  # IP-адрес вашего VPS
 VPS_USERNAME = "root"       # Имя пользователя
 VPS_PASSWORD = "J!k7yV)FjExu[.gN"     # Пароль
-VPS_DEST_PATH = "/tmp"  # Путь для хранения файлов на VPS
+VPS_DEST_PATH = "/tmp/tts_files"  # Путь для хранения файлов на VPS
 
 STATIC_DIR = "static"
 os.makedirs(STATIC_DIR, exist_ok=True)
