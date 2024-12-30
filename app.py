@@ -21,7 +21,7 @@ logger.info("TTS model initialized: %s", MODEL_NAME)
 # Настройки для VPS
 VPS_HOST = "95.179.247.70"  # IP-адрес вашего VPS
 VPS_USERNAME = "root"       # Имя пользователя
-VPS_PASSWORD = "{S9j}DfJ-xH.zBkt"  # Пароль
+VPS_PASSWORD = "J!k7yV)FjExu[.gN"     # Пароль
 VPS_DEST_PATH = "/tmp/tts_files"  # Путь для хранения файлов на VPS
 
 STATIC_DIR = "static"
@@ -69,11 +69,6 @@ def generate_audio():
         tts.tts_to_file(text=text, file_path=output_path)
         logger.info("Audio file generated: %s", output_path)
 
-        # Проверка существования файла
-        if not os.path.exists(output_path):
-            logger.error(f"Generated WAV file not found: {output_path}")
-            return jsonify({"error": "Generated WAV file not found"}), 500
-
         # Изменение высоты звука
         processed_filename = f"processed_{uuid.uuid4().hex}.wav"
         processed_path = os.path.join(STATIC_DIR, processed_filename)
@@ -86,24 +81,16 @@ def generate_audio():
         convert_to_ogg(processed_path, ogg_path)
         logger.info("Converted to OGG: %s", ogg_path)
 
-        # Проверка существования файла OGG
+        # Проверка существования файла
         if not os.path.exists(ogg_path):
-            logger.error(f"OGG file not found: {ogg_path}")
-            return jsonify({"error": "OGG file not found"}), 500
-
-        # Логируем текущий список файлов перед передачей
-        logger.debug(f"Files in {STATIC_DIR}: {os.listdir(STATIC_DIR)}")
+            logger.error("OGG file not found.")
+            return jsonify({"error": "OGG file not found."}), 500
 
         # Отправка файла на VPS
         logger.info("Attempting to send file to VPS: %s", VPS_HOST)
-        transfer_successful = send_file_to_vps(ogg_path)
-
-        if not transfer_successful:
-            logger.error("Failed to transfer file to VPS.")
-            return jsonify({"error": "Failed to transfer file to VPS."}), 500
+        send_file_to_vps(ogg_path)
 
         # Удаление временных файлов
-        logger.info(f"Deleting local files: {output_path}, {processed_path}, {ogg_path}")
         os.remove(output_path)
         os.remove(processed_path)
         os.remove(ogg_path)
@@ -114,7 +101,7 @@ def generate_audio():
     except Exception as e:
         logger.error("Error during audio generation: %s", str(e))
         return jsonify({"error": str(e)}), 500
-        
+
 def lower_pitch(input_path, output_path):
     """
     Понижает высоту звука с фиксированным pitch_factor = 0.6.
@@ -146,17 +133,10 @@ def convert_to_ogg(input_path, output_path):
 
 def send_file_to_vps(file_path):
     """
-    Отправляет файл на VPS через SCP и возвращает результат.
+    Отправляет файл на VPS через SCP.
     """
     try:
-        # Проверяем, существует ли файл
-        if not os.path.exists(file_path):
-            logger.error(f"File not found: {file_path}")
-            return False
-
         logger.info("Connecting to VPS at %s", VPS_HOST)
-
-        # Установка SSH соединения
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(VPS_HOST, username=VPS_USERNAME, password=VPS_PASSWORD)
@@ -165,27 +145,14 @@ def send_file_to_vps(file_path):
         # Передача файла
         sftp = ssh.open_sftp()
         dest_path = os.path.join(VPS_DEST_PATH, os.path.basename(file_path))
-        logger.info(f"Uploading file to {dest_path}...")
         sftp.put(file_path, dest_path)
         sftp.close()
         ssh.close()
-        logger.info("File successfully sent to VPS: %s", dest_path)
-
-        return True
-
-    except FileNotFoundError as e:
-        logger.error("Local file not found during SCP: %s", str(e))
-        return False
-    except paramiko.SSHException as e:
-        logger.error("SSH connection error: %s", str(e))
-        return False
-    except Exception as e:
-        logger.error("Error sending file to VPS: %s", str(e))
-        return False
+        logger.info("File successfully sent to VPS: %s", file_path)
 
     except Exception as e:
         logger.error("Error sending file to VPS: %s", str(e))
-        return False
+        raise
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
