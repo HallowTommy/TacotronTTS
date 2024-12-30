@@ -72,18 +72,13 @@ def generate_audio():
         # Проверка существования файла
         if not os.path.exists(output_path):
             logger.error(f"Generated WAV file not found: {output_path}")
-            raise FileNotFoundError(f"Generated WAV file not found: {output_path}")
+            return jsonify({"error": "Generated WAV file not found"}), 500
 
         # Изменение высоты звука
         processed_filename = f"processed_{uuid.uuid4().hex}.wav"
         processed_path = os.path.join(STATIC_DIR, processed_filename)
         lower_pitch(output_path, processed_path)
         logger.info("Processed audio file created: %s", processed_path)
-
-        # Проверка существования обработанного файла
-        if not os.path.exists(processed_path):
-            logger.error(f"Processed WAV file not found: {processed_path}")
-            raise FileNotFoundError(f"Processed WAV file not found: {processed_path}")
 
         # Конвертация в OGG
         ogg_filename = f"{uuid.uuid4().hex}.ogg"
@@ -94,14 +89,17 @@ def generate_audio():
         # Проверка существования файла OGG
         if not os.path.exists(ogg_path):
             logger.error(f"OGG file not found: {ogg_path}")
-            raise FileNotFoundError(f"OGG file not found: {ogg_path}")
+            return jsonify({"error": "OGG file not found"}), 500
+
+        # Логируем текущий список файлов перед передачей
+        logger.debug(f"Files in {STATIC_DIR}: {os.listdir(STATIC_DIR)}")
 
         # Отправка файла на VPS
         logger.info("Attempting to send file to VPS: %s", VPS_HOST)
         transfer_successful = send_file_to_vps(ogg_path)
 
         if not transfer_successful:
-            logger.error("Failed to transfer file to VPS. Retrying later.")
+            logger.error("Failed to transfer file to VPS.")
             return jsonify({"error": "Failed to transfer file to VPS."}), 500
 
         # Удаление временных файлов
@@ -116,7 +114,7 @@ def generate_audio():
     except Exception as e:
         logger.error("Error during audio generation: %s", str(e))
         return jsonify({"error": str(e)}), 500
-
+        
 def lower_pitch(input_path, output_path):
     """
     Понижает высоту звука с фиксированным pitch_factor = 0.6.
@@ -174,6 +172,16 @@ def send_file_to_vps(file_path):
         logger.info("File successfully sent to VPS: %s", dest_path)
 
         return True
+
+    except FileNotFoundError as e:
+        logger.error("Local file not found during SCP: %s", str(e))
+        return False
+    except paramiko.SSHException as e:
+        logger.error("SSH connection error: %s", str(e))
+        return False
+    except Exception as e:
+        logger.error("Error sending file to VPS: %s", str(e))
+        return False
 
     except Exception as e:
         logger.error("Error sending file to VPS: %s", str(e))
