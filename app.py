@@ -147,12 +147,14 @@ def send_file_to_vps(file_path):
         # Передача файла через SCP
         sftp = ssh.open_sftp()
         dest_path = os.path.join(VPS_DEST_PATH, os.path.basename(file_path))
+        logger.info(f"Uploading file to {dest_path}...")
         sftp.put(file_path, dest_path)
         sftp.close()
         logger.info("File successfully sent to VPS: %s", dest_path)
 
         # Добавление файла в плейлист Liquidsoap
         playlist_update_command = f"python3 /tmp/update_playlist.py {dest_path}"
+        logger.info(f"Executing playlist update command: {playlist_update_command}")
         stdin, stdout, stderr = ssh.exec_command(playlist_update_command)
         
         # Логирование результата команды
@@ -165,6 +167,10 @@ def send_file_to_vps(file_path):
         
         # Закрытие SSH соединения
         ssh.close()
+
+        # Удаление локального файла только после успешной передачи
+        logger.info(f"Deleting local file: {file_path}")
+        os.remove(file_path)
 
     except Exception as e:
         logger.error("Error sending file to VPS: %s", str(e))
