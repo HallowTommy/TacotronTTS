@@ -21,7 +21,7 @@ logger.info("TTS model initialized: %s", MODEL_NAME)
 # Настройки для VPS
 VPS_HOST = "95.179.247.70"  # IP-адрес вашего VPS
 VPS_USERNAME = "root"       # Имя пользователя
-VPS_PASSWORD = "{S9j}DfJ-xH.zBkt"     # Пароль
+VPS_PASSWORD = "J!k7yV)FjExu[.gN"  # Пароль
 VPS_DEST_PATH = "/tmp/tts_files"  # Путь для хранения файлов на VPS
 
 STATIC_DIR = "static"
@@ -69,11 +69,21 @@ def generate_audio():
         tts.tts_to_file(text=text, file_path=output_path)
         logger.info("Audio file generated: %s", output_path)
 
+        # Проверка существования файла
+        if not os.path.exists(output_path):
+            logger.error(f"Generated WAV file not found: {output_path}")
+            raise FileNotFoundError(f"Generated WAV file not found: {output_path}")
+
         # Изменение высоты звука
         processed_filename = f"processed_{uuid.uuid4().hex}.wav"
         processed_path = os.path.join(STATIC_DIR, processed_filename)
         lower_pitch(output_path, processed_path)
         logger.info("Processed audio file created: %s", processed_path)
+
+        # Проверка существования обработанного файла
+        if not os.path.exists(processed_path):
+            logger.error(f"Processed WAV file not found: {processed_path}")
+            raise FileNotFoundError(f"Processed WAV file not found: {processed_path}")
 
         # Конвертация в OGG
         ogg_filename = f"{uuid.uuid4().hex}.ogg"
@@ -81,16 +91,21 @@ def generate_audio():
         convert_to_ogg(processed_path, ogg_path)
         logger.info("Converted to OGG: %s", ogg_path)
 
-        # Проверка существования файла
+        # Проверка существования файла OGG
         if not os.path.exists(ogg_path):
-            logger.error("OGG file not found.")
-            return jsonify({"error": "OGG file not found."}), 500
+            logger.error(f"OGG file not found: {ogg_path}")
+            raise FileNotFoundError(f"OGG file not found: {ogg_path}")
 
         # Отправка файла на VPS
         logger.info("Attempting to send file to VPS: %s", VPS_HOST)
-        send_file_to_vps(ogg_path)
+        transfer_successful = send_file_to_vps(ogg_path)
+
+        if not transfer_successful:
+            logger.error("Failed to transfer file to VPS. Retrying later.")
+            return jsonify({"error": "Failed to transfer file to VPS."}), 500
 
         # Удаление временных файлов
+        logger.info(f"Deleting local files: {output_path}, {processed_path}, {ogg_path}")
         os.remove(output_path)
         os.remove(processed_path)
         os.remove(ogg_path)
@@ -133,48 +148,36 @@ def convert_to_ogg(input_path, output_path):
 
 def send_file_to_vps(file_path):
     """
-    Отправляет файл на VPS через SCP и обновляет плейлист Liquidsoap.
+    Отправляет файл на VPS через SCP и возвращает результат.
     """
     try:
+        # Проверяем, существует ли файл
+        if not os.path.exists(file_path):
+            logger.error(f"File not found: {file_path}")
+            return False
+
         logger.info("Connecting to VPS at %s", VPS_HOST)
-        
+
         # Установка SSH соединения
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(VPS_HOST, username=VPS_USERNAME, password=VPS_PASSWORD)
         logger.info("Connected to VPS successfully.")
 
-        # Передача файла через SCP
+        # Передача файла
         sftp = ssh.open_sftp()
         dest_path = os.path.join(VPS_DEST_PATH, os.path.basename(file_path))
         logger.info(f"Uploading file to {dest_path}...")
         sftp.put(file_path, dest_path)
         sftp.close()
+        ssh.close()
         logger.info("File successfully sent to VPS: %s", dest_path)
 
-        # Добавление файла в плейлист Liquidsoap
-        playlist_update_command = f"python3 /tmp/update_playlist.py {dest_path}"
-        logger.info(f"Executing playlist update command: {playlist_update_command}")
-        stdin, stdout, stderr = ssh.exec_command(playlist_update_command)
-        
-        # Логирование результата команды
-        output = stdout.read().decode().strip()
-        errors = stderr.read().decode().strip()
-        if output:
-            logger.info(f"Playlist update output: {output}")
-        if errors:
-            logger.error(f"Playlist update errors: {errors}")
-        
-        # Закрытие SSH соединения
-        ssh.close()
-
-        # Удаление локального файла только после успешной передачи
-        logger.info(f"Deleting local file: {file_path}")
-        os.remove(file_path)
+        return True
 
     except Exception as e:
         logger.error("Error sending file to VPS: %s", str(e))
-        raise
+        return False
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
