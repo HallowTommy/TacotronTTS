@@ -137,14 +137,14 @@ def convert_to_ogg(input_path, output_path):
 def send_file_to_vps(file_path):
     """
     Отправляет файл на VPS через SCP.
-    Возвращает True, если файл был успешно передан.
+    Удаляет файл на TTS только после успешной передачи.
     """
     try:
         if not os.path.exists(file_path):
-            logger.error(f"File does not exist: {file_path}")
+            logger.error(f"File does not exist before sending: {file_path}")
             return False
 
-        logger.info("Connecting to VPS at %s", VPS_HOST)
+        logger.info(f"Sending file to VPS: {file_path}")
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(VPS_HOST, username=VPS_USERNAME, password=VPS_PASSWORD)
@@ -156,13 +156,17 @@ def send_file_to_vps(file_path):
         sftp.put(file_path, dest_path)
         sftp.close()
         ssh.close()
-        logger.info("File successfully sent to VPS: %s", file_path)
+        logger.info(f"File successfully sent to VPS: {dest_path}")
 
-        return True  # Передача успешна
+        # ✅ Удаляем файл на TTS только после успешной передачи
+        os.remove(file_path)
+        logger.info(f"File deleted from TTS: {file_path}")
+
+        return True  # ✅ Успешно
 
     except Exception as e:
-        logger.error("Error sending file to VPS: %s", str(e))
-        return False  # ❌ Передача провалилась
+        logger.error(f"Error sending file to VPS: {str(e)}")
+        return False  # ❌ Ошибка, файл НЕ удаляется
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
