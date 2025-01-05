@@ -90,18 +90,17 @@ def generate_audio():
         logger.info("Attempting to send file to VPS: %s", VPS_HOST)
         send_file_to_vps(ogg_path)
 
+        # Удаление временных файлов
+        os.remove(output_path)
+        os.remove(processed_path)
+        os.remove(ogg_path)
+        logger.info("Temporary files deleted.")
+
         return jsonify({"status": "success", "message": "File sent to VPS successfully."})
 
     except Exception as e:
         logger.error("Error during audio generation: %s", str(e))
         return jsonify({"error": str(e)}), 500
-
-    finally:
-        # Удаление временных файлов только если они существуют
-        for file_path in [output_path, processed_path, ogg_path]:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                logger.info(f"Temporary file deleted: {file_path}")
 
 def lower_pitch(input_path, output_path):
     """
@@ -134,13 +133,9 @@ def convert_to_ogg(input_path, output_path):
 
 def send_file_to_vps(file_path):
     """
-    Отправляет файл на VPS через SCP и удаляет его только при успешной отправке.
+    Отправляет файл на VPS через SCP.
     """
     try:
-        if not os.path.exists(file_path):
-            logger.error(f"File does not exist: {file_path}")
-            return
-
         logger.info("Connecting to VPS at %s", VPS_HOST)
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -155,13 +150,8 @@ def send_file_to_vps(file_path):
         ssh.close()
         logger.info("File successfully sent to VPS: %s", file_path)
 
-        # Только теперь удаляем файл локально
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            logger.info(f"Local file deleted: {file_path}")
-
     except Exception as e:
-        logger.error(f"Error sending file to VPS: {str(e)}")
+        logger.error("Error sending file to VPS: %s", str(e))
         raise
 
 if __name__ == "__main__":
