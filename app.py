@@ -21,7 +21,7 @@ logger.info("TTS model initialized: %s", MODEL_NAME)
 # Настройки для VPS
 VPS_HOST = "95.179.247.70"  # IP-адрес вашего VPS
 VPS_USERNAME = "root"       # Имя пользователя
-VPS_PASSWORD = "{S9j}DfJ-xH.zBkt"  # Пароль
+VPS_PASSWORD = "{S9j}DfJ-xH.zBkt"     # Пароль
 VPS_DEST_PATH = "/tmp/tts_files"  # Путь для хранения файлов на VPS
 
 STATIC_DIR = "static"
@@ -81,23 +81,20 @@ def generate_audio():
         convert_to_ogg(processed_path, ogg_path)
         logger.info("Converted to OGG: %s", ogg_path)
 
-        # Проверка существования файла перед отправкой
+        # Проверка существования файла
         if not os.path.exists(ogg_path):
             logger.error("OGG file not found.")
             return jsonify({"error": "OGG file not found."}), 500
 
         # Отправка файла на VPS
         logger.info("Attempting to send file to VPS: %s", VPS_HOST)
-        success = send_file_to_vps(ogg_path)
+        send_file_to_vps(ogg_path)
 
-        # Удаление файлов **только если файл успешно отправлен**
-        if success:
-            os.remove(output_path)
-            os.remove(processed_path)
-            os.remove(ogg_path)
-            logger.info("Temporary files deleted after successful transfer.")
-        else:
-            logger.warning("File was NOT deleted because transfer to VPS failed.")
+        # Удаление временных файлов
+        os.remove(output_path)
+        os.remove(processed_path)
+        os.remove(ogg_path)
+        logger.info("Temporary files deleted.")
 
         return jsonify({"status": "success", "message": "File sent to VPS successfully."})
 
@@ -137,14 +134,9 @@ def convert_to_ogg(input_path, output_path):
 def send_file_to_vps(file_path):
     """
     Отправляет файл на VPS через SCP.
-    Удаляет файл на TTS только после успешной передачи.
     """
     try:
-        if not os.path.exists(file_path):
-            logger.error(f"File does not exist before sending: {file_path}")
-            return False
-
-        logger.info(f"Sending file to VPS: {file_path}")
+        logger.info("Connecting to VPS at %s", VPS_HOST)
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(VPS_HOST, username=VPS_USERNAME, password=VPS_PASSWORD)
@@ -156,17 +148,13 @@ def send_file_to_vps(file_path):
         sftp.put(file_path, dest_path)
         sftp.close()
         ssh.close()
-        logger.info(f"File successfully sent to VPS: {dest_path}")
-
-        # ✅ Удаляем файл на TTS только после успешной передачи
-        os.remove(file_path)
-        logger.info(f"File deleted from TTS: {file_path}")
-
-        return True  # ✅ Успешно
+        logger.info("File successfully sent to VPS: %s", file_path)
 
     except Exception as e:
-        logger.error(f"Error sending file to VPS: {str(e)}")
-        return False  # ❌ Ошибка, файл НЕ удаляется
+        logger.error("Error sending file to VPS: %s", str(e))
+        raise
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
+
