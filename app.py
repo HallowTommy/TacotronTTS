@@ -21,7 +21,7 @@ logger.info("TTS model initialized: %s", MODEL_NAME)
 # Настройки для VPS
 VPS_HOST = "95.179.247.70"  # IP-адрес вашего VPS
 VPS_USERNAME = "root"       # Имя пользователя
-VPS_PASSWORD = "F$w3JiwJeG*{CUsC"     # Пароль
+VPS_PASSWORD = "2c}Gd)QMri,@#f$Y"     # Пароль
 VPS_DEST_PATH = "/tmp/tts_files"  # Путь для хранения файлов на VPS
 
 STATIC_DIR = "static"
