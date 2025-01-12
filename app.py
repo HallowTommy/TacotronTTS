@@ -69,6 +69,10 @@ def generate_audio():
         tts.tts_to_file(text=text, file_path=output_path)
         logger.info("Audio file generated: %s", output_path)
 
+        # Получаем длительность аудиофайла
+        duration = get_audio_duration(output_path)
+        logger.info(f"Generated audio duration: {duration} seconds")
+
         # Изменение высоты звука
         processed_filename = f"processed_{uuid.uuid4().hex}.wav"
         processed_path = os.path.join(STATIC_DIR, processed_filename)
@@ -96,7 +100,12 @@ def generate_audio():
         os.remove(ogg_path)
         logger.info("Temporary files deleted.")
 
-        return jsonify({"status": "success", "message": "File sent to VPS successfully."})
+        # Отправляем ответ с длительностью
+        return jsonify({
+            "status": "success",
+            "message": "File sent to VPS successfully.",
+            "duration": duration
+        })
 
     except Exception as e:
         logger.error("Error during audio generation: %s", str(e))
