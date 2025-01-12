@@ -46,6 +46,22 @@ check_ffmpeg()  # Проверяем наличие ffmpeg перед обраб
 def home():
     return jsonify({"message": "SHROKAI TTS is running!"})
 
+def get_audio_duration(file_path):
+    """
+    Получает длительность аудиофайла с помощью ffprobe.
+    """
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-i", file_path, "-show_entries", "format=duration", "-v", "quiet", "-of", "csv=p=0"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        return float(result.stdout.strip())
+    except Exception as e:
+        logger.error(f"Error getting audio duration: {e}")
+        return None
+
 @app.route("/generate", methods=["POST"])
 def generate_audio():
     try:
