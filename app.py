@@ -46,21 +46,17 @@ check_ffmpeg()  # Проверяем наличие ffmpeg перед обраб
 def home():
     return jsonify({"message": "SHROKAI TTS is running!"})
 
-def get_audio_duration(file_path):
+def get_audio_length(file_path):
     """
-    Получает длительность аудиофайла с помощью ffprobe.
+    Определяет длину аудиофайла (в секундах).
     """
     try:
-        result = subprocess.run(
-            ["ffprobe", "-i", file_path, "-show_entries", "format=duration", "-v", "quiet", "-of", "csv=p=0"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        return float(result.stdout.strip())
+        audio = AudioSegment.from_file(file_path)
+        duration = len(audio) / 1000  # Переводим миллисекунды в секунды
+        return round(duration, 2)  # Округляем до 2 знаков
     except Exception as e:
-        logger.error(f"Error getting audio duration: {e}")
-        return None
+        logger.error("Error getting audio length: %s", str(e))
+        return 0
 
 @app.route("/generate", methods=["POST"])
 def generate_audio():
@@ -85,10 +81,6 @@ def generate_audio():
         tts.tts_to_file(text=text, file_path=output_path)
         logger.info("Audio file generated: %s", output_path)
 
-        # Получаем длительность аудиофайла
-        duration = get_audio_duration(output_path)
-        logger.info(f"Generated audio duration: {duration} seconds")
-
         # Изменение высоты звука
         processed_filename = f"processed_{uuid.uuid4().hex}.wav"
         processed_path = os.path.join(STATIC_DIR, processed_filename)
@@ -106,6 +98,10 @@ def generate_audio():
             logger.error("OGG file not found.")
             return jsonify({"error": "OGG file not found."}), 500
 
+        # Определяем длину аудиофайла
+        audio_length = get_audio_length(ogg_path)
+        logger.info("Audio length calculated: %s seconds", audio_length)
+
         # Отправка файла на VPS
         logger.info("Attempting to send file to VPS: %s", VPS_HOST)
         send_file_to_vps(ogg_path)
@@ -116,11 +112,11 @@ def generate_audio():
         os.remove(ogg_path)
         logger.info("Temporary files deleted.")
 
-        # Отправляем ответ с длительностью
+        # Возвращаем длину аудиофайла в JSON-ответе
         return jsonify({
             "status": "success",
             "message": "File sent to VPS successfully.",
-            "duration": duration
+            "audio_length": audio_length
         })
 
     except Exception as e:
@@ -181,5 +177,3 @@ def send_file_to_vps(file_path):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
-
