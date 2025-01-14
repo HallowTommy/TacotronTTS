@@ -103,8 +103,13 @@ def generate_audio():
         logger.info("Audio length calculated: %s seconds", audio_length)
 
         # Отправка файла на VPS
-        logger.info("Attempting to send file to VPS: %s", VPS_HOST)
-        send_file_to_vps(ogg_path)
+        try:
+            send_file_to_vps(ogg_path)
+            vps_uploaded = True  # Файл успешно загружен
+            logger.info("File successfully uploaded to VPS.")
+        except Exception as e:
+            vps_uploaded = False  # Ошибка загрузки на сервер
+            logger.error("Failed to upload file to VPS: %s", str(e))
 
         # Удаление временных файлов
         os.remove(output_path)
@@ -112,11 +117,12 @@ def generate_audio():
         os.remove(ogg_path)
         logger.info("Temporary files deleted.")
 
-        # Возвращаем длину аудиофайла в JSON-ответе
+        # Возвращаем длину аудиофайла и статус загрузки
         return jsonify({
             "status": "success",
-            "message": "File sent to VPS successfully.",
-            "audio_length": audio_length
+            "message": "File processed successfully.",
+            "audio_length": audio_length,
+            "vps_uploaded": vps_uploaded  # ✅ Добавляем флаг загрузки
         })
 
     except Exception as e:
